@@ -1,0 +1,21 @@
+name: "Deploy"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: rajpal-se/configure-ssh-credentials@v1
+        id: configure_ssh
+        with:
+          key: ${{ secrets.SSH_KEY }}
+          hostname: ${{ secrets.HOSTNAME }}
+
+      - uses: ./
+        with:
+          aws-ecr-repository: ${{ secrets.AWS_ECR_REPOSITORY }}
+          aws-ecr-region: ${{ secrets.AWS_ECR_REGION }}

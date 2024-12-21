@@ -1,0 +1,47 @@
+name: "Remove Dangling Docker Images"
+description: "Custom GitHub Action to remove dangling Docker images locally and from AWS ECR."
+author: "Rajpal Singh"
+inputs:
+  host:
+    description: "The SSH host for remote commands."
+    required: false
+    default: "github-actions"
+  aws-ecr-repository:
+    description: "The AWS ECR repository name."
+    required: false
+  aws-ecr-region:
+    description: "The AWS ECR repository region."
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    # Check if the SSH config file exists
+    - name: Check for SSH config file
+      shell: bash
+      run: |
+        if [ ! -f "./.tmp/.ssh/config" ]; then
+          echo "Error: SSH config file './.tmp/.ssh/config' does not exist."
+          exit 1
+        fi
+
+    - name: Remove dangling Docker images locally
+      shell: bash
+      run: |
+        ssh -F "./.tmp/.ssh/config" ${{ inputs.host }} << 'EOF'
+          docker image prune -f
+        EOF
+
+    - name: Remove dangling Docker images from AWS ECR
+      shell: bash
+      if: ${{ inputs.aws-ecr-repository != '' && inputs.aws-ecr-region != '' }}
+      run: |
+        ssh -F "./.tmp/.ssh/config" ${{ inputs.host }} << 'EOF'
+          for digest in $(aws ecr describe-images --repository-name ${{ inputs.aws-ecr-repository }} --region ${{ inputs.aws-ecr-region }} --query 'imageDetails[?imageTags==`null`].imageDigest' --output text); do
+            aws ecr batch-delete-image --repository-name ${{ inputs.aws-ecr-repository }} --region ${{ inputs.aws-ecr-region }} --image-ids imageDigest=$digest
+          done
+        EOF
+
+branding:
+  icon: command
+  color: red
